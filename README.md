@@ -1,270 +1,182 @@
-# 🧠 Modèles génératifs avec PyTorch — MNIST
+# TP2 — Modèles génératifs avec PyTorch sur MNIST
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" alt="Python 3.11">
-  <img src="https://img.shields.io/badge/PyTorch-2.10.0-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch 2.10">
-  <img src="https://img.shields.io/badge/Torchvision-0.25.0-EE4C2C?logo=pytorch&logoColor=white" alt="Torchvision">
-  <img src="https://img.shields.io/badge/UV-Environment%20Manager-6B5CE7" alt="UV">
-  <img src="https://img.shields.io/badge/Jupyter-Notebook-F37626?logo=jupyter&logoColor=white" alt="Jupyter">
-</p>
+Créer, entraîner, évaluer et explorer trois réseaux de neurones sur des chiffres manuscrits : un **classifieur**, un **autoencodeur simple (AE)** et un **autoencodeur variationnel (VAE)**.
 
-<p align="center">
-  <strong>Activité Pratique N°2 — Modèles génératifs</strong><br>
-  De la classification à la génération d'images avec les réseaux de neurones PyTorch.
-</p>
+Le projet traite la **première partie du TP**. Le code, les explications mathématiques et les conclusions sont en français. Le notebook est livré avec ses sorties exécutées : **24 cellules de code exécutées sans erreur et 16 figures enregistrées**.
 
-<p align="center">
-  <a href="https://github.com/flamekk/Modeles-generatifs">Voir le dépôt GitHub</a> ·
-  <a href="TP2_Modeles_generatifs_MNIST.ipynb">Ouvrir le notebook</a> ·
-  <a href="resultats/metriques.json">Consulter les métriques</a>
-</p>
+**[Consulter le notebook complet](TP2_Modeles_generatifs_MNIST.ipynb)** · **[Voir les mesures enregistrées](resultats/metriques.json)** · **[Parcourir les figures](resultats/figures/)**
 
----
+![Comparaison des images originales et des reconstructions par l'AE et le VAE](resultats/figures/11_comparaison_reconstructions.png)
 
-## 📌 Présentation du projet
+*De haut en bas : images originales du test, reconstructions de l'AE, puis reconstructions du VAE à partir de la moyenne latente. Les colonnes correspondent aux chiffres de 0 à 9.*
 
-Ce projet a été réalisé dans le cadre de l'**Activité Pratique N°2 — Modèles génératifs**, encadrée par **Pr. Mohamed YOUSSFI**. Il met en œuvre PyTorch sur le jeu de données **MNIST** afin de créer, entraîner, tester et explorer trois types de réseaux de neurones :
+## Objectifs et modèles
 
-1. **Un modèle discriminatif** pour reconnaître les chiffres manuscrits de 0 à 9.
-2. **Un autoencodeur simple (AE)** pour compresser puis reconstruire les images.
-3. **Un autoencodeur variationnel (VAE)** pour apprendre un espace latent probabiliste et générer de nouvelles images.
-
-Le travail suit une démarche expérimentale reproductible : préparation des données, entraînement, sélection sur validation, évaluation sur le jeu de test et exploration visuelle des représentations apprises.
-
-![Comparaison des images originales et des reconstructions AE et VAE](resultats/figures/11_comparaison_reconstructions.png)
-
-*Comparaison sur des images de test : originales, reconstructions de l'AE et reconstructions du VAE.*
-
-## 🎯 Objectifs pédagogiques
-
-- Configurer un environnement Python avec **UV** dans Visual Studio Code.
-- Charger et explorer le dataset MNIST avec Torchvision.
-- Construire, entraîner et évaluer un modèle discriminatif.
-- Comprendre le fonctionnement d'un autoencodeur et de son espace latent.
-- Comprendre le principe du VAE, la reparamétrisation et la divergence KL.
-- Générer de nouvelles images à partir de vecteurs latents.
-- Comparer les résultats à l'aide de métriques et de visualisations.
-
-## 🗂️ Contenu du projet
-
-| Partie | Travail réalisé | Éléments étudiés |
+| Étape | Objectif | Architecture et apprentissage |
 |---|---|---|
-| 0. Environnement | Configuration UV / Python 3.11 | Dépendances, noyau Jupyter, reproductibilité |
-| 1. Dataset MNIST | Chargement et préparation | Images 28 × 28, tenseurs, normalisation `[0, 1]` |
-| 2. Classifieur | Classification des chiffres | `784 → 128 → 10`, ReLU, Cross Entropy |
-| 3. Autoencodeur (AE) | Compression et reconstruction | Encodeur/décodeur, code latent de dimension 2, MSE |
-| 4. Autoencodeur variationnel (VAE) | Reconstruction et génération | Moyenne, variance, reparamétrisation, BCE + KL |
+| Charger MNIST | Préparer les images et les partitions | Images de 28 × 28 pixels, intensités dans `[0, 1]` |
+| Classifieur | Prédire la classe d'une image | `784 → 128 → 10`, ReLU et entropie croisée |
+| Autoencodeur | Reconstruire une image à travers un code compressé | Encodeur `784 → 128 → 32 → 2`, décodeur symétrique et MSE |
+| VAE | Reconstruire et générer de nouvelles images | Encodeur `784 → 256 → 64`, sorties `μ` et `log σ²` de dimension 2, décodeur `2 → 64 → 256 → 784` |
 
-### 1. Modèle discriminatif — Classification MNIST
+Le classifieur utilise les étiquettes pendant l'entraînement. L'AE et le VAE apprennent à partir des images ; leurs étiquettes servent ensuite à visualiser les classes dans l'espace latent.
 
-Le classifieur apprend à associer chaque image à l'une des dix classes (0 à 9).
+L'AE associe chaque image à un code déterministe. Le VAE apprend une distribution latente et utilise la reparamétrisation `z = μ + exp(log σ² / 2) × ε`, avec `ε ~ N(0, I)`. Sa perte combine une reconstruction par BCE et une divergence KL vers le prior normal, avec **β = 1**. Pour générer une nouvelle image, on tire directement `z ~ N(0, I)` et on le décode.
 
-```text
-Image MNIST (1 × 28 × 28)
-          ↓
-        Flatten
-          ↓
-     Linear(784 → 128)
-          ↓
-         ReLU
-          ↓
-     Linear(128 → 10)
-          ↓
-   Prédiction du chiffre
-```
+## Données et protocole
 
-**Éléments clés :** `DataLoader`, `CrossEntropyLoss`, optimiseur Adam, accuracy, F1 macro et matrice de confusion.
+Le lot officiel de 60 000 images d'entraînement de MNIST est séparé de façon reproductible. Le lot officiel de test est conservé pour l'évaluation finale.
 
-![Matrice de confusion du classifieur](resultats/figures/03_matrice_confusion.png)
-
-### 2. Autoencodeur simple — AE
-
-L'autoencodeur apprend sans utiliser les étiquettes : il encode une image dans un vecteur latent compact, puis tente de reconstruire l'image d'origine.
-
-```text
-Image (784)
-    ↓
-Encodeur : 784 → 128 → 32 → 2
-    ↓
-Code latent z (2 dimensions)
-    ↓
-Décodeur : 2 → 32 → 128 → 784
-    ↓
-Image reconstruite
-```
-
-**Explorations réalisées :** qualité des reconstructions, visualisation de l'espace latent, prototypes par chiffre et interpolation entre deux représentations.
-
-![Reconstructions de l'autoencodeur](resultats/figures/06_reconstructions_ae.png)
-
-### 3. Autoencodeur variationnel — VAE
-
-Le VAE apprend une distribution dans l'espace latent. Son encodeur estime les paramètres `μ` et `log σ²`, puis l'échantillonnage utilise la reparamétrisation :
-
-`z = μ + exp(0.5 × log σ²) × ε`, avec `ε ~ N(0, I)`.
-
-```text
-Image (784)
-    ↓
-Encodeur : 784 → 256 → 64
-    ↓
-     μ et log σ²
-    ↓
-Échantillonnage latent z (2 dimensions)
-    ↓
-Décodeur : 2 → 64 → 256 → 784
-    ↓
-Image reconstruite / générée
-```
-
-La fonction objectif combine la reconstruction (**BCE**) et la régularisation de l'espace latent (**divergence KL**), avec `β = 1`. De nouvelles images peuvent être générées en échantillonnant `z ~ N(0, I)` puis en utilisant le décodeur.
-
-![Images générées par le VAE](resultats/figures/13_generation_vae.png)
-
-![Grille de génération dans l'espace latent du VAE](resultats/figures/14_grille_latente_vae.png)
-
-## 📊 Protocole expérimental
-
-Le protocole conserve le jeu de test officiel MNIST pour l'évaluation finale. Les 60 000 images d'entraînement officielles sont divisées en apprentissage et validation.
-
-| Partition | Nombre d'images | Utilisation |
+| Partition | Nombre d'images | Rôle |
 |---|---:|---|
-| Apprentissage | 55 000 | Mise à jour des paramètres |
-| Validation | 5 000 | Sélection de la meilleure époque |
-| Test | 10 000 | Évaluation finale |
+| Apprentissage | 55 000 | Mettre à jour les paramètres |
+| Validation | 5 000 | Sélectionner la meilleure époque de chaque modèle |
+| Test | 10 000 | Mesurer les performances finales |
 
-**Paramètres communs :** graine aléatoire `42`, batch size `256`, learning rate `0.001`, dimension latente `2`. Les modèles sont entraînés respectivement pendant 5 époques (classifieur), 15 époques (AE) et 20 époques (VAE), avec sélection de la meilleure époque sur validation.
+Les partitions d'apprentissage et de validation sont disjointes. Toutes les images sont utilisées, sans sous-échantillonnage. La graine est fixée à **42**, la taille des lots à **256** et le taux d'apprentissage d'Adam à **0,001**. La dimension latente de l'AE et du VAE est fixée à **2** pour permettre une exploration dans le plan.
 
-## 📈 Résultats obtenus
+![Exemples MNIST avec leurs étiquettes](resultats/figures/01_exemples_mnist.png)
 
-Les résultats ci-dessous proviennent de l'exécution enregistrée dans `resultats/metriques.json` (Python 3.11.18, PyTorch 2.10.0, Torchvision 0.25.0, exécution CPU).
+## Résultats de l'exécution
 
-| Modèle | Métrique sur le test | Résultat |
+Ces valeurs proviennent de [l'exécution enregistrée](resultats/metriques.json), sous **Python 3.11.18, PyTorch 2.10.0 et Torchvision 0.25.0, sur CPU**. Les meilleures époques ont été sélectionnées sur la validation, avant le calcul des tests.
+
+| Modèle ou référence | Mesure sur les 10 000 images de test | Résultat |
 |---|---|---:|
-| Classifieur | Accuracy | **96,15 %** |
+| Classifieur | Précision de classification (accuracy) | **96,15 %** |
 | Classifieur | F1 macro | **0,9610** |
-| Image moyenne d'apprentissage (référence) | MSE par pixel | 0,06747 |
-| Autoencodeur (AE) | MSE par pixel | **0,04126** |
-| VAE (décodage de `μ(x)`) | MSE par pixel | **0,03945** |
+| Image moyenne d'apprentissage | MSE par pixel | 0,06747 |
+| Autoencodeur | MSE par pixel | **0,04126** |
+| VAE, décodage de `μ(x)` | MSE par pixel | **0,03945** |
 
-Le classifieur atteint une accuracy de 96,15 % sur les 10 000 images de test. Les deux autoencodeurs obtiennent une erreur de reconstruction inférieure à la référence de l'image moyenne. Le VAE permet en plus de générer des images à partir de nouveaux échantillons latents.
+L'image moyenne sert de référence simple : elle est calculée sur l'apprentissage, puis utilisée pour reconstruire toutes les images de test. Les deux autoencodeurs obtiennent une MSE plus faible que cette référence.
 
-> **À noter :** la BCE, la MSE et la perte de classification ne mesurent pas la même chose et ne doivent pas être comparées directement. Une MSE faible ne suffit pas, à elle seule, à juger le réalisme ou la diversité des images générées.
+Le VAE obtient également une **BCE de 141,30**, une **KL de 6,05** et un **objectif BCE + KL de 147,34 par image**, estimé avec cinq tirages par image de test. La BCE, la MSE et la perte du classifieur ont des définitions différentes et ne se comparent pas directement.
 
-### Galerie des résultats
+### Classification : analyser les erreurs
 
-| Analyse | Visualisation |
-|---|---|
-| Exemples du dataset MNIST | ![Exemples MNIST](resultats/figures/01_exemples_mnist.png) |
-| Courbes d'entraînement du classifieur | ![Courbes classifieur](resultats/figures/02_courbes_classifieur.png) |
-| Erreurs de classification | ![Erreurs classifieur](resultats/figures/04_erreurs_classifieur.png) |
-| Espace latent de l'AE | ![Espace latent AE](resultats/figures/07_espace_latent_ae.png) |
-| Courbes d'entraînement du VAE | ![Courbes VAE](resultats/figures/10_courbes_vae.png) |
-| Comparaison des erreurs de reconstruction | ![Comparaison MSE](resultats/figures/16_comparaison_mse.png) |
+![Matrice de confusion du classifieur sur les 10 000 images de test](resultats/figures/03_matrice_confusion.png)
 
-Le dossier [`resultats/figures/`](resultats/figures/) contient les 16 figures produites. Les historiques d'entraînement et les métriques détaillées sont également fournis.
+Les lignes indiquent les classes réelles et les colonnes les classes prédites. Les valeurs sur la diagonale correspondent aux prédictions correctes. Les autres cases permettent de repérer les confusions entre chiffres.
 
-## 🛠️ Technologies utilisées
+Voir aussi les [courbes d'apprentissage et de validation](resultats/figures/02_courbes_classifieur.png) et les [dix premières erreurs du test](resultats/figures/04_erreurs_classifieur.png).
 
-- **Python 3.11** — langage principal.
-- **PyTorch 2.10.0** — création et entraînement des réseaux de neurones.
-- **Torchvision 0.25.0** — accès au dataset MNIST.
-- **Torcheval 0.0.7** — évaluation des modèles.
-- **NumPy** — calcul numérique.
-- **Matplotlib** — visualisation des données et résultats.
-- **UV** — gestion de l'environnement et des dépendances.
-- **VS Code & Jupyter** — développement et exécution du notebook.
-- **Git & GitHub** — gestion de versions et partage du projet.
+### Reconstruction : comparer les modèles
 
-## ⚙️ Installation et exécution
+![MSE de reconstruction de l'image moyenne, de l'AE et du VAE](resultats/figures/16_comparaison_mse.png)
+
+Les trois mesures utilisent le même jeu de test et la même échelle de pixels. La faible dimension latente entraîne une perte de détails : certaines reconstructions restent ambiguës. Les architectures et les pertes de l'AE et du VAE diffèrent ; cette comparaison ne permet donc pas d'attribuer l'écart de MSE à la seule régularisation KL.
+
+### Génération : produire de nouveaux chiffres avec le VAE
+
+![Vingt images générées par le VAE à partir de vecteurs gaussiens](resultats/figures/13_generation_vae.png)
+
+Ces vingt images sont générées sans image d'entrée, à partir de nouveaux vecteurs latents. Tous les tirages sont affichés, sans sélection visuelle. Plusieurs formes sont reconnaissables, mais certaines images restent floues ou ambiguës. Le modèle n'est pas conditionnel : on ne choisit pas directement la classe générée.
+
+### Exploration : parcourir l'espace latent
+
+![Grille de 225 images décodées dans l'espace latent du VAE](resultats/figures/14_grille_latente_vae.png)
+
+Chaque case correspond au décodage d'une position `(z₁, z₂)` dans une grille allant de −3 à 3. Les transitions entre les formes rendent visible l'organisation de l'espace latent. Les positions proches des coins sont moins probables sous le prior normal.
+
+Le notebook contient aussi les espaces latents de [l'AE](resultats/figures/07_espace_latent_ae.png) et du [VAE](resultats/figures/12_espace_latent_vae.png), les [prototypes de classes de l'AE](resultats/figures/08_prototypes_ae.png), ainsi que des interpolations pour [l'AE](resultats/figures/09_interpolation_ae.png) et le [VAE](resultats/figures/15_interpolation_vae.png).
+
+**Limites :** la MSE mesure la reconstruction et ne suffit pas à évaluer le réalisme ou la diversité des générations. Les résultats décrivent une exécution avec une graine donnée. Les GAN et les modèles de diffusion présents dans les supports de cours ne font pas partie de cette première partie.
+
+## Installation et exécution
 
 ### Prérequis
 
-- Python 3.11.
-- [UV](https://docs.astral.sh/uv/getting-started/installation/) installé.
-- Visual Studio Code avec les extensions **Python** et **Jupyter**.
-- Une connexion Internet au premier lancement pour télécharger MNIST.
+- [UV](https://docs.astral.sh/uv/getting-started/installation/) pour gérer Python et les dépendances.
+- VS Code avec les extensions **Python** et **Jupyter**, pour utiliser le notebook dans l'éditeur.
+- Une connexion Internet pour installer les dépendances et télécharger MNIST au premier lancement.
 
-### 1. Cloner le dépôt
+Le projet utilise **Python 3.11**. La version est indiquée dans `.python-version`, les dépendances dans `pyproject.toml` et les versions résolues dans `uv.lock`. L'exécution de référence a fonctionné sur CPU ; CUDA n'est pas nécessaire.
 
-```bash
-git clone https://github.com/flamekk/Modeles-generatifs.git
-cd Modeles-generatifs
-```
+### Exécuter dans VS Code
 
-### 2. Installer l'environnement et les dépendances
+Cloner ou télécharger le dépôt, ouvrir son dossier dans VS Code, puis exécuter dans le terminal à la racine du projet :
 
-```bash
+```powershell
 uv sync --locked
 ```
 
-Cette commande crée l'environnement `.venv` et installe les versions définies dans `uv.lock`.
+Ouvrir [TP2_Modeles_generatifs_MNIST.ipynb](TP2_Modeles_generatifs_MNIST.ipynb), choisir **Sélectionner le noyau → Environnements Python → .venv**, puis cliquer sur **Tout exécuter**.
 
-### 3. Ouvrir le notebook
+L'activation de l'environnement est facultative avec `uv run`. Pour l'activer manuellement sous PowerShell :
 
-Ouvrir `TP2_Modeles_generatifs_MNIST.ipynb` dans VS Code, sélectionner le noyau Python de `.venv`, puis exécuter les cellules.
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-### 4. Exécuter depuis le terminal (optionnel)
+Sous Linux ou macOS : `source .venv/bin/activate`.
 
-```bash
+### Exécuter depuis le terminal
+
+```powershell
 uv run python scripts/executer_notebook.py
 ```
 
-Pour reconstruire le notebook à partir de sa source pédagogique avant exécution :
+Cette commande exécute le carnet de haut en bas et conserve les sorties dans le notebook. Elle recalcule les mesures, les courbes et les figures. Le premier lancement télécharge MNIST dans `data/`.
 
-```bash
+| Modèle | Nombre d'époques | Meilleure époque de référence |
+|---|---:|---:|
+| Classifieur | 5 | 5 |
+| Autoencodeur | 15 | 15 |
+| VAE | 20 | 20 |
+
+L'exécution de référence complète a duré environ **5 minutes sur CPU**. Le temps et les mesures peuvent varier selon le matériel et les versions de l'environnement.
+
+Les paramètres des meilleurs modèles sont enregistrés localement dans `resultats/modeles/`. Ce dossier est ignoré par Git ; une nouvelle exécution les régénère. Une prévisualisation HTML de travail est également créée dans `.qa/`.
+
+## Captures du notebook exécuté
+
+Ces captures proviennent du rendu du carnet après exécution.
+
+<details>
+<summary>Voir l'introduction, les objectifs et la synthèse des résultats</summary>
+
+![Capture du notebook avec les objectifs et les résultats mesurés](docs/images/notebook_apercu.png)
+
+</details>
+
+<details>
+<summary>Voir la conclusion et les réponses aux questions de compréhension</summary>
+
+![Capture de la conclusion et des réponses pédagogiques du notebook](docs/images/notebook_conclusion.png)
+
+</details>
+
+## Structure du dépôt
+
+```text
+.
+├── README.md
+├── TP2_Modeles_generatifs_MNIST.ipynb   # Carnet principal avec sorties
+├── pyproject.toml                     # Configuration du projet UV
+├── uv.lock                            # Versions résolues des dépendances
+├── .python-version                    # Python 3.11
+├── .gitignore
+├── docs/
+│   └── images/                        # Captures utilisées dans ce README
+├── scripts/
+│   ├── tp2_source.py                  # Source pédagogique à cellules
+│   ├── construire_notebook.py         # Construction du carnet depuis la source
+│   └── executer_notebook.py           # Exécution complète et sauvegarde
+└── resultats/
+    ├── metriques.json                 # Mesures, paramètres et versions
+    ├── matrice_confusion.json
+    ├── historique_classifieur.csv
+    ├── historique_autoencodeur.csv
+    ├── historique_vae.csv
+    └── figures/                       # Les 16 figures produites
+```
+
+Pour modifier la source puis reconstruire le notebook :
+
+```powershell
 uv run python scripts/construire_notebook.py
 uv run python scripts/executer_notebook.py
 ```
 
-**Attention :** la reconstruction du notebook efface ses sorties précédentes ; elle est utile après une modification de `scripts/tp2_source.py`.
-
-## 📁 Structure du dépôt
-
-```text
-Modeles-generatifs/
-├── README.md
-├── .python-version
-├── pyproject.toml
-├── uv.lock
-├── .gitignore
-├── TP2_Modeles_generatifs_MNIST.ipynb
-├── docs/
-│   └── images/                    # Captures du notebook
-├── scripts/
-│   ├── tp2_source.py              # Source pédagogique
-│   ├── construire_notebook.py    # Génération du notebook
-│   └── executer_notebook.py      # Exécution complète
-└── resultats/
-    ├── metriques.json             # Résultats détaillés
-    ├── matrice_confusion.json
-    ├── historique_*.csv           # Historiques d'entraînement
-    └── figures/                    # 16 visualisations
-```
-
-Les données téléchargées, l'environnement virtuel, les fichiers temporaires et les poids des modèles entraînés localement sont exclus du suivi Git via `.gitignore`.
-
-## 🎓 Compétences développées
-
-- Préparation et exploration d'un dataset d'images.
-- Construction et entraînement de réseaux de neurones avec PyTorch.
-- Classification supervisée et évaluation multi-classes.
-- Compression, reconstruction et représentation dans un espace latent.
-- Compréhension du VAE, de la reparamétrisation et de la divergence KL.
-- Génération d'images par échantillonnage latent.
-- Analyse des performances et interprétation de visualisations.
-- Gestion d'un environnement reproductible avec UV et Git.
-
-## 👩‍💻 Auteur
-
-**Hiba Zbari**  
-Étudiante ingénieure — Big Data & Intelligence Artificielle  
-Activité Pratique N°2 — Modèles génératifs avec PyTorch  
-Encadrement : **Pr. Mohamed YOUSSFI**
-
----
-
-<p align="center">
-  <strong>Built with Python, PyTorch & curiosity for Generative AI ✨</strong><br>
-  <a href="https://github.com/flamekk/Modeles-generatifs">github.com/flamekk/Modeles-generatifs</a>
-</p>
+**La construction efface les anciennes sorties du notebook.** Elle est utile après une modification de `scripts/tp2_source.py` ; elle n'est pas nécessaire pour consulter ou relancer le carnet livré.

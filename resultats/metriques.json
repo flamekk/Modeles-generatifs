@@ -1,0 +1,54 @@
+{
+  "configuration": {
+    "seed": 42,
+    "n_train": 55000,
+    "n_validation": 5000,
+    "n_test": 10000,
+    "batch_size": 256,
+    "latent_dim": 2,
+    "epochs_classifier": 5,
+    "epochs_ae": 15,
+    "epochs_vae": 20,
+    "learning_rate": 0.001,
+    "beta": 1.0,
+    "mc_test": 5,
+    "device": "cpu",
+    "python": "3.11.18"
+  },
+  "versions": {
+    "torch": "2.10.0",
+    "torchvision": "0.25.0",
+    "torcheval": "0.0.7",
+    "numpy": "2.4.6",
+    "matplotlib": "3.11.2"
+  },
+  "classifieur": {
+    "loss": 0.13045010159313677,
+    "accuracy": 0.9614999890327454,
+    "f1_macro": 0.9610303044319153,
+    "best_epoch": 5
+  },
+  "autoencodeur": {
+    "mse": 0.04125930608632613,
+    "baseline_mse": 0.06747030579703195,
+    "best_epoch": 15
+  },
+  "vae": {
+    "bce": 141.29843769042975,
+    "kl": 6.045461618041992,
+    "mse_mu": 0.03945256540337387,
+    "mse_sample": 0.03995018023354666,
+    "loss": 147.34389930847175,
+    "best_epoch": 20
+  },
+  "temps_secondes": {
+    "classifieur": 11.812480500084348,
+    "autoencodeur": 79.76455039996654,
+    "vae": 131.33200419996865
+  },
+  "validation": {
+    "split_disjoint": true,
+    "accuracy_torcheval": 0.9614999890327454,
+    "confusion_total": 10000
+  }
+}
