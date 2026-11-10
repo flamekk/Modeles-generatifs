@@ -1,0 +1,9 @@
+.venv/
+.tools/
+.uv-cache/
+.python/
+.qa/
+data/
+__pycache__/
+.ipynb_checkpoints/
+resultats/modeles/

@@ -1,0 +1,17 @@
+[project]
+name = "tp2-generatifs-mnist"
+version = "0.1.0"
+description = "TP2 : classification, autoencodeur et VAE PyTorch sur MNIST"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "ipykernel>=6.29,<8",
+    "matplotlib>=3.9,<4",
+    "nbclient>=0.10,<1",
+    "nbconvert>=7.16,<8",
+    "nbformat>=5.10,<6",
+    "numpy>=1.26,<3",
+    "torch==2.10.0",
+    "torcheval==0.0.7",
+    "torchvision==0.25.0",
+]
