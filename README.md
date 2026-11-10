@@ -1,182 +1,623 @@
-# TP2 — Modèles génératifs avec PyTorch sur MNIST
+# 🧠 GENERATIVE DEEP LEARNING — PyTorch & MNIST
 
-Créer, entraîner, évaluer et explorer trois réseaux de neurones sur des chiffres manuscrits : un **classifieur**, un **autoencodeur simple (AE)** et un **autoencodeur variationnel (VAE)**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/PyTorch-2.10.0-EE4C2C?logo=pytorch&logoColor=white" />
+  <img src="https://img.shields.io/badge/Torchvision-0.25.0-EE4C2C?logo=pytorch&logoColor=white" />
+  <img src="https://img.shields.io/badge/MNIST-Computer%20Vision-blueviolet" />
+  <img src="https://img.shields.io/badge/UV-Environment%20Management-6B4FBB" />
+  <img src="https://img.shields.io/badge/Status-Completed-success" />
+</p>
 
-Le projet traite la **première partie du TP**. Le code, les explications mathématiques et les conclusions sont en français. Le notebook est livré avec ses sorties exécutées : **24 cellules de code exécutées sans erreur et 16 figures enregistrées**.
+<p align="center">
+  <strong>TP N°2 — Modèles génératifs avec PyTorch</strong>
+  <br/>
+  <i>From Image Classification to Latent Space Exploration and Image Generation</i>
+</p>
 
-**[Consulter le notebook complet](TP2_Modeles_generatifs_MNIST.ipynb)** · **[Voir les mesures enregistrées](resultats/metriques.json)** · **[Parcourir les figures](resultats/figures/)**
+---
 
-![Comparaison des images originales et des reconstructions par l'AE et le VAE](resultats/figures/11_comparaison_reconstructions.png)
+## ✨ Project Overview
 
-*De haut en bas : images originales du test, reconstructions de l'AE, puis reconstructions du VAE à partir de la moyenne latente. Les colonnes correspondent aux chiffres de 0 à 9.*
+How can a neural network recognize handwritten digits, reconstruct images and even generate entirely new ones?
 
-## Objectifs et modèles
+This project explores three complementary Deep Learning architectures using **PyTorch** and the **MNIST handwritten digit dataset**.
 
-| Étape | Objectif | Architecture et apprentissage |
-|---|---|---|
-| Charger MNIST | Préparer les images et les partitions | Images de 28 × 28 pixels, intensités dans `[0, 1]` |
-| Classifieur | Prédire la classe d'une image | `784 → 128 → 10`, ReLU et entropie croisée |
-| Autoencodeur | Reconstruire une image à travers un code compressé | Encodeur `784 → 128 → 32 → 2`, décodeur symétrique et MSE |
-| VAE | Reconstruire et générer de nouvelles images | Encodeur `784 → 256 → 64`, sorties `μ` et `log σ²` de dimension 2, décodeur `2 → 64 → 256 → 784` |
+Starting with a discriminative neural network, the project progressively introduces generative learning through a classical Autoencoder (AE) and a Variational Autoencoder (VAE).
 
-Le classifieur utilise les étiquettes pendant l'entraînement. L'AE et le VAE apprennent à partir des images ; leurs étiquettes servent ensuite à visualiser les classes dans l'espace latent.
+Beyond model training, the work focuses on understanding the mathematical foundations, evaluating reconstruction quality, exploring latent representations and generating new handwritten digits.
 
-L'AE associe chaque image à un code déterministe. Le VAE apprend une distribution latente et utilise la reparamétrisation `z = μ + exp(log σ² / 2) × ε`, avec `ε ~ N(0, I)`. Sa perte combine une reconstruction par BCE et une divergence KL vers le prior normal, avec **β = 1**. Pour générer une nouvelle image, on tire directement `z ~ N(0, I)` et on le décode.
+**The objective is not only to train models, but also to understand how they learn, represent and generate visual information.**
 
-## Données et protocole
+## 🎯 Project Highlights
 
-Le lot officiel de 60 000 images d'entraînement de MNIST est séparé de façon reproductible. Le lot officiel de test est conservé pour l'évaluation finale.
+| Component | Implementation |
+|---|---|
+| Dataset | MNIST – 60,000 training and 10,000 test images |
+| Discriminative model | Multiclass digit classifier |
+| Generative model 01 | Fully connected Autoencoder |
+| Generative model 02 | Variational Autoencoder |
+| Latent representation | 2-dimensional latent space |
+| Training framework | PyTorch |
+| Environment management | UV |
+| Visualization | Matplotlib |
+| Experimental outputs | 16 figures and quantitative metrics |
 
-| Partition | Nombre d'images | Rôle |
-|---|---:|---|
-| Apprentissage | 55 000 | Mettre à jour les paramètres |
-| Validation | 5 000 | Sélectionner la meilleure époque de chaque modèle |
-| Test | 10 000 | Mesurer les performances finales |
+---
 
-Les partitions d'apprentissage et de validation sont disjointes. Toutes les images sont utilisées, sans sous-échantillonnage. La graine est fixée à **42**, la taille des lots à **256** et le taux d'apprentissage d'Adam à **0,001**. La dimension latente de l'AE et du VAE est fixée à **2** pour permettre une exploration dans le plan.
+# 🏗️ 1. Project Architecture
 
-![Exemples MNIST avec leurs étiquettes](resultats/figures/01_exemples_mnist.png)
-
-## Résultats de l'exécution
-
-Ces valeurs proviennent de [l'exécution enregistrée](resultats/metriques.json), sous **Python 3.11.18, PyTorch 2.10.0 et Torchvision 0.25.0, sur CPU**. Les meilleures époques ont été sélectionnées sur la validation, avant le calcul des tests.
-
-| Modèle ou référence | Mesure sur les 10 000 images de test | Résultat |
-|---|---|---:|
-| Classifieur | Précision de classification (accuracy) | **96,15 %** |
-| Classifieur | F1 macro | **0,9610** |
-| Image moyenne d'apprentissage | MSE par pixel | 0,06747 |
-| Autoencodeur | MSE par pixel | **0,04126** |
-| VAE, décodage de `μ(x)` | MSE par pixel | **0,03945** |
-
-L'image moyenne sert de référence simple : elle est calculée sur l'apprentissage, puis utilisée pour reconstruire toutes les images de test. Les deux autoencodeurs obtiennent une MSE plus faible que cette référence.
-
-Le VAE obtient également une **BCE de 141,30**, une **KL de 6,05** et un **objectif BCE + KL de 147,34 par image**, estimé avec cinq tirages par image de test. La BCE, la MSE et la perte du classifieur ont des définitions différentes et ne se comparent pas directement.
-
-### Classification : analyser les erreurs
-
-![Matrice de confusion du classifieur sur les 10 000 images de test](resultats/figures/03_matrice_confusion.png)
-
-Les lignes indiquent les classes réelles et les colonnes les classes prédites. Les valeurs sur la diagonale correspondent aux prédictions correctes. Les autres cases permettent de repérer les confusions entre chiffres.
-
-Voir aussi les [courbes d'apprentissage et de validation](resultats/figures/02_courbes_classifieur.png) et les [dix premières erreurs du test](resultats/figures/04_erreurs_classifieur.png).
-
-### Reconstruction : comparer les modèles
-
-![MSE de reconstruction de l'image moyenne, de l'AE et du VAE](resultats/figures/16_comparaison_mse.png)
-
-Les trois mesures utilisent le même jeu de test et la même échelle de pixels. La faible dimension latente entraîne une perte de détails : certaines reconstructions restent ambiguës. Les architectures et les pertes de l'AE et du VAE diffèrent ; cette comparaison ne permet donc pas d'attribuer l'écart de MSE à la seule régularisation KL.
-
-### Génération : produire de nouveaux chiffres avec le VAE
-
-![Vingt images générées par le VAE à partir de vecteurs gaussiens](resultats/figures/13_generation_vae.png)
-
-Ces vingt images sont générées sans image d'entrée, à partir de nouveaux vecteurs latents. Tous les tirages sont affichés, sans sélection visuelle. Plusieurs formes sont reconnaissables, mais certaines images restent floues ou ambiguës. Le modèle n'est pas conditionnel : on ne choisit pas directement la classe générée.
-
-### Exploration : parcourir l'espace latent
-
-![Grille de 225 images décodées dans l'espace latent du VAE](resultats/figures/14_grille_latente_vae.png)
-
-Chaque case correspond au décodage d'une position `(z₁, z₂)` dans une grille allant de −3 à 3. Les transitions entre les formes rendent visible l'organisation de l'espace latent. Les positions proches des coins sont moins probables sous le prior normal.
-
-Le notebook contient aussi les espaces latents de [l'AE](resultats/figures/07_espace_latent_ae.png) et du [VAE](resultats/figures/12_espace_latent_vae.png), les [prototypes de classes de l'AE](resultats/figures/08_prototypes_ae.png), ainsi que des interpolations pour [l'AE](resultats/figures/09_interpolation_ae.png) et le [VAE](resultats/figures/15_interpolation_vae.png).
-
-**Limites :** la MSE mesure la reconstruction et ne suffit pas à évaluer le réalisme ou la diversité des générations. Les résultats décrivent une exécution avec une graine donnée. Les GAN et les modèles de diffusion présents dans les supports de cours ne font pas partie de cette première partie.
-
-## Installation et exécution
-
-### Prérequis
-
-- [UV](https://docs.astral.sh/uv/getting-started/installation/) pour gérer Python et les dépendances.
-- VS Code avec les extensions **Python** et **Jupyter**, pour utiliser le notebook dans l'éditeur.
-- Une connexion Internet pour installer les dépendances et télécharger MNIST au premier lancement.
-
-Le projet utilise **Python 3.11**. La version est indiquée dans `.python-version`, les dépendances dans `pyproject.toml` et les versions résolues dans `uv.lock`. L'exécution de référence a fonctionné sur CPU ; CUDA n'est pas nécessaire.
-
-### Exécuter dans VS Code
-
-Cloner ou télécharger le dépôt, ouvrir son dossier dans VS Code, puis exécuter dans le terminal à la racine du projet :
-
-```powershell
-uv sync --locked
-```
-
-Ouvrir [TP2_Modeles_generatifs_MNIST.ipynb](TP2_Modeles_generatifs_MNIST.ipynb), choisir **Sélectionner le noyau → Environnements Python → .venv**, puis cliquer sur **Tout exécuter**.
-
-L'activation de l'environnement est facultative avec `uv run`. Pour l'activer manuellement sous PowerShell :
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Sous Linux ou macOS : `source .venv/bin/activate`.
-
-### Exécuter depuis le terminal
-
-```powershell
-uv run python scripts/executer_notebook.py
-```
-
-Cette commande exécute le carnet de haut en bas et conserve les sorties dans le notebook. Elle recalcule les mesures, les courbes et les figures. Le premier lancement télécharge MNIST dans `data/`.
-
-| Modèle | Nombre d'époques | Meilleure époque de référence |
-|---|---:|---:|
-| Classifieur | 5 | 5 |
-| Autoencodeur | 15 | 15 |
-| VAE | 20 | 20 |
-
-L'exécution de référence complète a duré environ **5 minutes sur CPU**. Le temps et les mesures peuvent varier selon le matériel et les versions de l'environnement.
-
-Les paramètres des meilleurs modèles sont enregistrés localement dans `resultats/modeles/`. Ce dossier est ignoré par Git ; une nouvelle exécution les régénère. Une prévisualisation HTML de travail est également créée dans `.qa/`.
-
-## Captures du notebook exécuté
-
-Ces captures proviennent du rendu du carnet après exécution.
-
-<details>
-<summary>Voir l'introduction, les objectifs et la synthèse des résultats</summary>
-
-![Capture du notebook avec les objectifs et les résultats mesurés](docs/images/notebook_apercu.png)
-
-</details>
-
-<details>
-<summary>Voir la conclusion et les réponses aux questions de compréhension</summary>
-
-![Capture de la conclusion et des réponses pédagogiques du notebook](docs/images/notebook_conclusion.png)
-
-</details>
-
-## Structure du dépôt
+The project follows three main learning approaches:
 
 ```text
-.
+                 MNIST DATASET
+                 28 × 28 Images
+                       |
+          +------------+------------+
+          |            |            |
+          v            v            v
+      CLASSIFIER       AE          VAE
+          |            |            |
+          v            v            v
+      Digit Class   Encoder      Encoder
+       (0–9)           |          μ, log σ²
+                       |            |
+                       v            v
+                  Latent Code   Reparameterization
+                    (2D)            |
+                       |            v
+                       v       Latent Sampling
+                    Decoder         |
+                       |            v
+                       v         Decoder
+                  Reconstruction   |
+                                    v
+                              Generated Images
+```
+
+### Three approaches, three different objectives
+
+- **Classifier:** Learns to recognize and predict digit categories.
+- **Autoencoder:** Learns a compressed representation and reconstructs the original image.
+- **Variational Autoencoder:** Learns a probabilistic latent space that enables reconstruction and generation of new images.
+
+---
+
+# 📊 2. Experimental Results
+
+The following results come from the executed notebook and the saved experimental metrics.
+
+<details>
+<summary><strong>🏆 Model Performance — Click to expand</strong></summary>
+
+| Model | Evaluation Metric | Test Result |
+|---|---|---:|
+| Classifier | Accuracy | **96.15%** |
+| Classifier | Macro F1-score | **0.9610** |
+| Autoencoder | Reconstruction MSE | **0.04126** |
+| Variational Autoencoder | Reconstruction MSE | **0.03945** |
+| Mean training image | Reference MSE | 0.06747 |
+
+The VAE also achieved:
+
+| Metric | Result |
+|---|---:|
+| Binary Cross Entropy (BCE) | 141.30 |
+| KL Divergence | 6.05 |
+| Total BCE + KL objective | 147.34 |
+
+*VAE loss values are estimated using five samples per test image. BCE, MSE and classification losses have different definitions and should not be directly compared.*
+
+</details>
+
+### 🔍 What do these results tell us?
+
+- The classifier achieves 96.15% accuracy on the MNIST test set.
+- Both generative models reconstruct images more accurately than the mean-image baseline according to MSE.
+- The VAE combines reconstruction with probabilistic regularization.
+- The two-dimensional latent space allows visual exploration of learned representations.
+
+---
+
+# 🟦 3. Discriminative Learning — MNIST Classifier
+
+**Objective:** Recognize handwritten digits from 0 to 9.
+
+The classifier learns the relationship between image pixels and their corresponding labels.
+
+### Architecture
+
+```text
+Input Image (28 × 28)
+         |
+       Flatten
+         |
+    Linear (784 → 128)
+         |
+        ReLU
+         |
+    Linear (128 → 10)
+         |
+         v
+    Digit Prediction
+```
+
+### Implementation
+
+- MNIST dataset loading.
+- Data preparation and normalization.
+- Training, validation and test split.
+- Fully connected neural network.
+- Cross Entropy Loss.
+- Adam optimizer.
+- Accuracy and Macro F1-score.
+- Confusion matrix.
+- Misclassified image analysis.
+
+### Experimental Performance
+
+**Test Accuracy: 96.15%**
+
+![Classifier confusion matrix](resultats/figures/03_matrice_confusion.png)
+
+*Confusion matrix illustrating correct predictions and classification errors across the ten digit classes.*
+
+Additional visualizations:
+
+- [Training and validation curves](resultats/figures/02_courbes_classifieur.png)
+- [Misclassified test images](resultats/figures/04_erreurs_classifieur.png)
+
+---
+
+# 🟩 4. Generative Learning — Autoencoder (AE)
+
+**Objective:** Learn a compressed representation of handwritten digits and reconstruct the original images.
+
+Unlike the classifier, the Autoencoder does not require class labels during training.
+
+### Architecture
+
+```text
+       Original Image
+          784 px
+             |
+             v
+          Encoder
+       784 → 128 → 32
+             |
+             v
+       Latent Space
+          2D (z)
+             |
+             v
+          Decoder
+        2 → 32 → 128
+             |
+             v
+      Reconstructed Image
+           784 px
+```
+
+### Implementation
+
+- Encoder and decoder construction.
+- Two-dimensional latent representation.
+- Compression and reconstruction.
+- Mean Squared Error (MSE).
+- Adam optimizer.
+- Latent space visualization.
+- Class prototypes.
+- Latent interpolation.
+
+### Reconstruction Results
+
+**Test Reconstruction MSE: 0.04126**
+
+![AE and VAE reconstruction comparison](resultats/figures/11_comparaison_reconstructions.png)
+
+*Original images and their corresponding AE and VAE reconstructions.*
+
+### Exploring the latent space
+
+The two-dimensional representation makes it possible to visualize how different handwritten digits are organized in the latent space.
+
+![Autoencoder latent space](resultats/figures/07_espace_latent_ae.png)
+
+Additional experiments:
+
+- [Latent space visualization](resultats/figures/07_espace_latent_ae.png)
+- [Class prototypes](resultats/figures/08_prototypes_ae.png)
+- [Latent interpolation](resultats/figures/09_interpolation_ae.png)
+
+---
+
+# 🟪 5. Variational Autoencoder (VAE)
+
+**Objective:** Learn a probabilistic latent representation capable of reconstructing existing images and generating new handwritten digits.
+
+The VAE introduces a probabilistic encoder that predicts two parameters:
+
+- μ (mean)
+- log σ² (log variance)
+
+### Architecture
+
+```text
+       Input Image
+          784 px
+             |
+             v
+          Encoder
+       784 → 256 → 64
+             |
+       +-----+-----+
+       |           |
+       v           v
+      Mean       Log Variance
+       μ          log σ²
+       |           |
+       +-----+-----+
+             |
+             v
+    Reparameterization
+     z = μ + σ × ε
+             |
+             v
+       Latent Vector
+             |
+             v
+          Decoder
+        2 → 64 → 256
+             |
+             v
+     Reconstructed Image
+```
+
+### Mathematical Foundations
+
+The reparameterization trick:
+
+\[
+z = \mu + \exp\left(\frac{\log \sigma^2}{2}\right)\epsilon
+\]
+
+where:
+
+\[
+\epsilon \sim \mathcal{N}(0,I)
+\]
+
+The loss function combines two objectives:
+
+\[
+\mathcal{L}_{VAE}
+=
+\mathcal{L}_{BCE}
++
+\beta D_{KL}
+\]
+
+With:
+
+\[
+\beta = 1
+\]
+
+- **BCE:** Measures reconstruction quality.
+- **KL Divergence:** Regularizes the latent distribution toward a standard normal distribution.
+
+### Reconstruction Performance
+
+**Test Reconstruction MSE: 0.03945**
+
+![VAE reconstruction comparison](resultats/figures/11_comparaison_reconstructions.png)
+
+### Generating New Handwritten Digits
+
+One of the most interesting capabilities of a VAE is generating new images without requiring an original input image.
+
+New latent vectors are sampled from:
+
+\[
+z \sim \mathcal{N}(0,I)
+\]
+
+The decoder transforms these vectors into new digit images.
+
+![Generated MNIST digits](resultats/figures/13_generation_vae.png)
+
+*Twenty generated samples obtained directly from randomly sampled latent vectors.*
+
+### Exploring the 2D Latent Space
+
+The two-dimensional latent space allows us to explore how the decoder transforms different latent coordinates into handwritten digits.
+
+![VAE latent space grid](resultats/figures/14_grille_latente_vae.png)
+
+Each image corresponds to a different position in the latent space.
+
+The gradual transitions between digits illustrate how the VAE learns a structured probabilistic representation.
+
+Additional visualizations:
+
+- [VAE latent space](resultats/figures/12_espace_latent_vae.png)
+- [Latent interpolation](resultats/figures/15_interpolation_vae.png)
+- [Reconstruction comparison](resultats/figures/11_comparaison_reconstructions.png)
+- [MSE comparison](resultats/figures/16_comparaison_mse.png)
+
+---
+
+# ⚖️ 6. Autoencoder vs Variational Autoencoder
+
+| Aspect | Autoencoder (AE) | Variational Autoencoder (VAE) |
+|---|---|---|
+| Latent representation | Deterministic | Probabilistic |
+| Encoder output | Latent vector | Mean and log variance |
+| Sampling | Not intrinsic | Reparameterization |
+| Reconstruction | Yes | Yes |
+| New image generation | Not directly supported by a regular prior | Yes |
+| Latent regularization | No KL term | KL divergence |
+| Main objective | Compression and reconstruction | Probabilistic representation and generation |
+
+### Experimental comparison
+
+| Model | Test MSE |
+|---|---:|
+| Mean-image baseline | 0.06747 |
+| Autoencoder | 0.04126 |
+| VAE | **0.03945** |
+
+The VAE achieves the lowest reconstruction MSE in this particular experiment. However, reconstruction error alone does not measure image realism or sample diversity.
+
+---
+
+# ⚙️ 7. Dataset & Experimental Protocol
+
+### MNIST Dataset
+
+The MNIST dataset contains grayscale handwritten digit images with dimensions of 28 × 28 pixels.
+
+| Dataset partition | Number of images | Purpose |
+|---|---:|---|
+| Training | 55,000 | Model optimization |
+| Validation | 5,000 | Best epoch selection |
+| Testing | 10,000 | Final evaluation |
+| **Total** | **70,000** | |
+
+### Experimental configuration
+
+| Parameter | Value |
+|---|---|
+| Random seed | 42 |
+| Batch size | 256 |
+| Optimizer | Adam |
+| Learning rate | 0.001 |
+| Latent dimension | 2 |
+| VAE β | 1 |
+| Hardware | CPU |
+
+### Training configuration
+
+| Model | Epochs | Best epoch |
+|---|---:|---:|
+| Classifier | 5 | 5 |
+| Autoencoder | 15 | 15 |
+| VAE | 20 | 20 |
+
+*Reference execution: approximately five minutes on CPU. Execution time may vary depending on hardware and software versions.*
+
+---
+
+# 🛠️ 8. Technology Stack
+
+| Technology | Role |
+|---|---|
+| Python 3.11 | Main programming language |
+| PyTorch 2.10.0 | Deep Learning framework |
+| Torchvision 0.25.0 | MNIST dataset and transformations |
+| NumPy | Numerical computations |
+| Matplotlib | Visualization and analysis |
+| Torcheval | Evaluation dependencies |
+| UV | Python environment and dependency management |
+| Jupyter Notebook | Interactive experimentation |
+| VS Code | Development environment |
+| Git & GitHub | Version control |
+
+---
+
+# 📂 9. Repository Structure
+
+```text
+Modeles-generatifs/
+│
 ├── README.md
-├── TP2_Modeles_generatifs_MNIST.ipynb   # Carnet principal avec sorties
-├── pyproject.toml                     # Configuration du projet UV
-├── uv.lock                            # Versions résolues des dépendances
-├── .python-version                    # Python 3.11
+├── TP2_Modeles_generatifs_MNIST.ipynb
+│
+├── pyproject.toml
+├── uv.lock
+├── .python-version
 ├── .gitignore
+│
 ├── docs/
-│   └── images/                        # Captures utilisées dans ce README
+│   └── images/
+│       ├── notebook_apercu.png
+│       └── notebook_conclusion.png
+│
 ├── scripts/
-│   ├── tp2_source.py                  # Source pédagogique à cellules
-│   ├── construire_notebook.py         # Construction du carnet depuis la source
-│   └── executer_notebook.py           # Exécution complète et sauvegarde
+│   ├── tp2_source.py
+│   ├── construire_notebook.py
+│   └── executer_notebook.py
+│
 └── resultats/
-    ├── metriques.json                 # Mesures, paramètres et versions
+    ├── metriques.json
     ├── matrice_confusion.json
     ├── historique_classifieur.csv
     ├── historique_autoencodeur.csv
     ├── historique_vae.csv
-    └── figures/                       # Les 16 figures produites
+    │
+    ├── figures/
+    │   ├── 01_exemples_mnist.png
+    │   ├── 02_courbes_classifieur.png
+    │   ├── 03_matrice_confusion.png
+    │   ├── 04_erreurs_classifieur.png
+    │   ├── ...
+    │   └── 16_comparaison_mse.png
+    │
+    └── modeles/
+        └── Generated locally (Git ignored)
 ```
 
-Pour modifier la source puis reconstruire le notebook :
+---
 
-```powershell
-uv run python scripts/construire_notebook.py
+# 🚀 10. Installation & Execution
+
+### Prerequisites
+
+- Python 3.11
+- UV package manager
+- Visual Studio Code
+- Python and Jupyter extensions
+
+### Step 1 — Clone the repository
+
+```bash
+git clone https://github.com/flamekk/Modeles-generatifs.git
+cd Modeles-generatifs
+```
+
+### Step 2 — Install dependencies
+
+```bash
+uv sync --locked
+```
+
+### Step 3 — Open the notebook
+
+Open:
+
+`TP2_Modeles_generatifs_MNIST.ipynb`
+
+Select the Python kernel corresponding to `.venv`.
+
+### Step 4 — Execute the notebook
+
+Run all cells sequentially.
+
+Alternatively, execute the complete notebook from the terminal:
+
+```bash
 uv run python scripts/executer_notebook.py
 ```
 
-**La construction efface les anciennes sorties du notebook.** Elle est utile après une modification de `scripts/tp2_source.py` ; elle n'est pas nécessaire pour consulter ou relancer le carnet livré.
+The script executes the notebook, recalculates the metrics and regenerates the figures.
+
+### Rebuild the notebook from its source
+
+```bash
+uv run python scripts/construire_notebook.py
+```
+
+**Important:** Rebuilding the notebook clears its previous outputs. It is not necessary when simply running the delivered notebook.
+
+---
+
+# 📈 11. Experimental Reproducibility
+
+The repository includes:
+
+- An executed Jupyter notebook.
+- A fixed random seed.
+- A reproducible train/validation split.
+- A UV dependency lockfile.
+- Saved evaluation metrics.
+- Training history CSV files.
+- Sixteen generated visualizations.
+- Scripts to rebuild and execute the notebook.
+
+Reference environment:
+
+- Python 3.11.18
+- PyTorch 2.10.0
+- Torchvision 0.25.0
+- CPU execution
+
+This makes it possible to inspect the experiments and reproduce the workflow.
+
+---
+
+# 🧠 12. Skills & Learning Outcomes
+
+Through this project, the following skills were developed:
+
+**Deep Learning**
+- Neural network architecture design.
+- Forward propagation and model optimization.
+- Training, validation and testing workflows.
+- Loss functions and gradient-based optimization.
+
+**Generative Modeling**
+- Autoencoder architecture.
+- Variational Autoencoder architecture.
+- Latent representations.
+- Reparameterization trick.
+- KL divergence.
+- Image reconstruction and generation.
+
+**Computer Vision**
+- MNIST dataset processing.
+- Image classification.
+- Reconstruction quality analysis.
+- Visualization of generated images.
+
+**Experimental Analysis**
+- Accuracy and F1-score.
+- MSE reconstruction evaluation.
+- Confusion matrix interpretation.
+- Latent space exploration.
+- Comparison of neural network architectures.
+
+**Development & Reproducibility**
+- Python environment management with UV.
+- Jupyter Notebook development.
+- Git and GitHub.
+- Experiment tracking and result persistence.
+
+---
+
+# 🔬 13. Limitations & Future Improvements
+
+This practical project focuses on the first part of the generative models activity.
+
+Possible extensions include:
+
+- Exploring different latent dimensions.
+- Testing different β values in the VAE.
+- Comparing reconstruction losses.
+- Improving generated image sharpness.
+- Experimenting with Convolutional Autoencoders.
+- Implementing Generative Adversarial Networks (GANs).
+- Exploring diffusion-based generative models.
+
+The current VAE is not class-conditional, so the generated digit class cannot be directly specified.
+
+---
+
+# 👩‍💻 Author
+
+<p align="center">
+  <strong>HIBA ZBARI</strong>
+  <br/>
+  Engineering Student — Big Data & Artificial Intelligence
+  <br/>
+  <br/>
+  <a href="https://github.com/flamekk">
+    <img src="https://img.shields.io/badge/GitHub-flamekk-181717?logo=github&logoColor=white" />
+  </a>
+  <br/>
+  <br/>
+  <strong>Academic Activity N°2 — Generative Models with PyTorch</strong>
+  <br/>
+  Mohamed YOUSSFI · 23 October 2026
+</p>
+
+---
